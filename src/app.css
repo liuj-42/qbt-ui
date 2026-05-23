@@ -1,42 +1,37 @@
 :root {
-
-
-
-    /*default theme is dark*/
-    /*--bg: rgb(18, 18, 18);*/
-    --bg: hsl(0, 0%, 7%);
-    --bg_light: hsl(0, 0%, 12%);
-    --bg_dark: hsl(0, 0%, 0%);
-    --border: hsl(0, 0%, 20%);
-    --text-1: hsl(0, 0%, 75%);
-    --text-2: hsl(0, 0%, 85%);
-    --text-3: hsl(0, 0%, 100%);
-    --accent: #1bfd9c;
-
-    
+	/*default theme is dark*/
+	/*--bg: rgb(18, 18, 18);*/
+	--bg: hsl(0, 0%, 7%);
+	--bg_light: hsl(0, 0%, 12%);
+	--bg_dark: hsl(0, 0%, 0%);
+	--border: hsl(0, 0%, 20%);
+	--text-1: hsl(0, 0%, 75%);
+	--text-2: hsl(0, 0%, 85%);
+	--text-3: hsl(0, 0%, 100%);
+	--accent: #1bfd9c;
 }
 
 body {
-    margin: 0; 
-    height: 100vh; 
-    width: 100vw;
-    background-color: var(--bg);
+	margin: 0;
+	height: 100vh;
+	width: 100vw;
+	background-color: var(--bg);
 
-    font-family: "Inter", sans-serif;
-    font-optical-sizing: auto;
-    font-weight: 400;
-    font-style: normal;
-    color: var(--text-1);
+	font-family: 'Inter', sans-serif;
+	font-optical-sizing: auto;
+	font-weight: 400;
+	font-style: normal;
+	color: var(--text-1);
 }
 
-[data-theme="light"] {
-    --bg: #ffffff;
-    --text: #111111;
-    --accent: #0066cc;
+[data-theme='light'] {
+	--bg: #ffffff;
+	--text: #111111;
+	--accent: #0066cc;
 }
 
-[data-theme="green"] {
-  --bg: #f0fff4;
-  --text: #1a3a1a;
-  --accent: #8ACE00;
+[data-theme='green'] {
+	--bg: #f0fff4;
+	--text: #1a3a1a;
+	--accent: #8ace00;
 }

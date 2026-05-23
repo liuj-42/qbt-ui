@@ -1,4 +1,5 @@
 # qbt-ui
+
 ui for my qbittorrent setup
 
 # sv
@@ -18,7 +19,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-deno run npm:sv@0.15.3 create --template minimal --types ts --add prettier eslint --install deno qbt-ui
+pnpm dlx sv@0.15.3 create --template minimal --types ts --add prettier eslint --install pnpm qbt-ui
 ```
 
 ## Developing
