@@ -16,7 +16,7 @@ component stuff:
 - move graphs into their own components + figure out what to do with the create/update chart functions
 - move the other things too, see if theres a slot or something to pass data through
 styling:
-- make it better
+- make it better 
 -->
 
 <script lang="ts">
