@@ -1,27 +1,29 @@
 <!--
 TODO:
 global options:
-- add toggle between bytes/bits
+- [x] add toggle between bytes/bits
+- [x] add types / constants to separate file
+- [ ] look into how to use global state for things like torrent data, etc.
 global stats:
-- add network connection status: firewalled/connected/disconnected
-- visual for space used / available w/ labels:
+- [ ] add network connection status: firewalled/connected/disconnected
+- [ ] visual for space used / available w/ labels:
     pie chart? bar chart? some other plot? check chart.js available options
 graphs:
-- add default numbers for y axis
-- label x axis
-- add controls for graph
-    - max time
-    - graph style (btop graph settings)
+- [x] add default numbers for y axis
+- [ ] label x axis
+- [ ] add controls for graph
+    - [ ] max time
+    - [ ] graph style (btop graph settings)
 component stuff:
-- move graphs into their own components + figure out what to do with the create/update chart functions
-- move the other things too, see if theres a slot or something to pass data through
+- [ ] move graphs into their own components + figure out what to do with the create/update chart functions
+- [ ] move the other things too, see if theres a slot or something to pass data through
 styling:
-- make it better 
+- [ ] make it better
 -->
 
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { formatBytes } from '$lib/utils/bytes';
+	import { format } from '$lib/utils/units';
 	import {
 		Chart,
 		LineController,
@@ -31,62 +33,13 @@ styling:
 		CategoryScale,
 		Filler
 	} from 'chart.js';
-
+	import type { TransferStats, torrentInfo } from '$lib/types';
 	Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler);
 
-	const GRAPH_TIME = 15;
+	let GRAPH_TIME = 15;
+	let SPEED_UNITS: 'bits' | 'bytes' = $state('bits');
+	let STORAGE_UNITS: 'bytes' | 'binary' = $state('bytes');
 
-	interface TransferStats {
-		lifetime: number; // lifetime transfer amount
-		session: number; // session transfer amount
-		limit: number; // speed limit
-		speed: number[]; // list of current speeds
-		count: number; // number of active trasnfers
-	}
-
-	interface torrentInfo {
-		dlspeed: number;
-		eta: number;
-		f_l_piece_prio: boolean;
-		force_start: boolean;
-		hash: string;
-		category: string;
-		name: string;
-		num_complete: number;
-		num_incomplete: number;
-		num_leeches: number;
-		num_seeds: number;
-		priority: number;
-		progress: number;
-		ratio: number;
-		seq_dl: boolean;
-		size: number;
-		state: torrentState;
-		super_seeding: boolean;
-		upspeed: number;
-		isPrivate: boolean;
-	}
-
-	type torrentState =
-		| 'error'
-		| 'missingFiles'
-		| 'uploading'
-		| 'pausedUP'
-		| 'queuedUP'
-		| 'stalledUP'
-		| 'checkingUP'
-		| 'forcedUP'
-		| 'allocating'
-		| 'downloading'
-		| 'metaDL'
-		| 'pausedDL'
-		| 'queuedDL'
-		| 'stalledDL'
-		| 'checkingDL'
-		| 'forcedDL'
-		| 'checkingResumeData'
-		| 'moving'
-		| 'unknown';
 
 	let uploadStats = $state<TransferStats>({
 		lifetime: 0,
@@ -131,7 +84,9 @@ styling:
 				scales: {
 					x: { display: false },
 					y: {
-						ticks: { callback: (v) => formatBytes(v as number) + '/s' }
+						min: 0,
+						suggestedMax: 1_000_000,
+						ticks: { callback: (v) => format(SPEED_UNITS, v as number) + 'ps' }
 					}
 				},
 				plugins: { legend: { display: false } }
@@ -199,15 +154,38 @@ styling:
 				downloadStats.count = data.length;
 			});
 	}
+
+	function toggleSpeedUnits() {
+		SPEED_UNITS = SPEED_UNITS == 'bytes' ? 'bits' : 'bytes';
+		if (uploadChart) updateChart(uploadChart, uploadStats.speed);
+		if (downloadChart) updateChart(downloadChart, downloadStats.speed);
+	}
+
+	function toggleDataUnits() {
+		STORAGE_UNITS = STORAGE_UNITS == 'bytes' ? 'binary' : 'bytes';
+	}
 </script>
 
 <div class="content">
-	<h1>torrents overview</h1>
+	<header>
+		<h1>torrents overview</h1>
+		<span></span>
+		<span class="units">
+			<label for="speed_units_toggle">
+				<input id="speed_units_toggle" type="checkbox" oninput={toggleSpeedUnits} />
+				speed units bytes to bits (kB/s -> kbps)
+			</label>
+			<label for="data_units_toggle">
+				<input id="data_units_toggle" type="checkbox" oninput={toggleDataUnits} />
+				data units bytes to binary units (kB -> KiB)
+			</label>
+		</span>
+	</header>
 	<div class="grid">
 		<div class="box tall">
 			<h4>global stats</h4>
-			<span>lifetime upload: {formatBytes(uploadStats.lifetime)}</span>
-			<span>lifetime download: {formatBytes(downloadStats.lifetime)}</span>
+			<span>lifetime upload: {format(STORAGE_UNITS, uploadStats.lifetime)}</span>
+			<span>lifetime download: {format(STORAGE_UNITS, downloadStats.lifetime)}</span>
 			<span>
 				ratio: {uploadStats.lifetime && downloadStats.lifetime
 					? (uploadStats.lifetime / downloadStats.lifetime).toFixed(2)
@@ -228,10 +206,12 @@ styling:
 		</div>
 		<div class="box">
 			<h4>upload stats</h4>
-			<span>session: {formatBytes(uploadStats.session)}</span>
-			<span>limit: {formatBytes(uploadStats.limit)}/s</span>
+			<span>session: {format(STORAGE_UNITS, uploadStats.session)}</span>
+			<span>limit: {format(SPEED_UNITS, uploadStats.limit)}ps</span>
 			<span>
-				current: {uploadStats.speed.length ? formatBytes(uploadStats.speed.at(-1)!) + '/s' : '—'}
+				current: {uploadStats.speed.length
+					? format(SPEED_UNITS, uploadStats.speed.at(-1)!) + 'ps'
+					: '—'}
 			</span>
 			<span>
 				active uploads: {uploadStats.count}
@@ -239,11 +219,11 @@ styling:
 		</div>
 		<div class="box">
 			<h4>download stats</h4>
-			<span>session: {formatBytes(downloadStats.session)}</span>
-			<span>limit: {formatBytes(downloadStats.limit)}/s</span>
+			<span>session: {format(STORAGE_UNITS, downloadStats.session)}</span>
+			<span>limit: {format(SPEED_UNITS, downloadStats.limit)}ps</span>
 			<span>
 				current: {downloadStats.speed.length
-					? formatBytes(downloadStats.speed.at(-1)!) + '/s'
+					? format(SPEED_UNITS, downloadStats.speed.at(-1)!) + 'ps'
 					: '—'}
 			</span>
 			<span>
@@ -254,6 +234,19 @@ styling:
 </div>
 
 <style>
+	header {
+		display: flex;
+
+		h1 {
+			flex-grow: 1;
+		}
+		.units {
+			display: flex;
+			flex-direction: column;
+			justify-content: space-evenly;
+			align-items: flex-start;
+		}
+	}
 	.content {
 		display: flex;
 		width: 100%;
