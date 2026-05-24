@@ -8,6 +8,7 @@ global stats:
 - [ ] add network connection status: firewalled/connected/disconnected
 - [ ] visual for space used / available w/ labels:
     pie chart? bar chart? some other plot? check chart.js available options
+- [x] fix rid for /sync/maindata endpoint
 graphs:
 - [x] add default numbers for y axis
 - [ ] label x axis
@@ -39,7 +40,7 @@ styling:
 	let GRAPH_TIME = 15;
 	let SPEED_UNITS: 'bits' | 'bytes' = $state('bits');
 	let STORAGE_UNITS: 'bytes' | 'binary' = $state('bytes');
-
+	let rid = $state(0);
 
 	let uploadStats = $state<TransferStats>({
 		lifetime: 0,
@@ -134,11 +135,14 @@ styling:
 				if (downloadChart) updateChart(downloadChart, downloadStats.speed);
 			});
 
-		fetch('/qbt/sync/maindata?rid=0')
+		fetch(`/qbt/sync/maindata?rid=${rid}`)
 			.then((res) => res.json())
 			.then((data) => {
-				uploadStats.lifetime = data.server_state.alltime_ul;
-				downloadStats.lifetime = data.server_state.alltime_dl;
+				if (data.server_state) {
+					if (data.server_state.alltime_ul) uploadStats.lifetime = data.server_state.alltime_ul;
+					if (data.server_state.alltime_dl) downloadStats.lifetime = data.server_state.alltime_dl;
+				}
+				if (data.rid) rid = data.rid;
 			});
 
 		fetch('/qbt/torrents/info?filter=seeding')
@@ -190,6 +194,9 @@ styling:
 				ratio: {uploadStats.lifetime && downloadStats.lifetime
 					? (uploadStats.lifetime / downloadStats.lifetime).toFixed(2)
 					: '—'}
+			</span>
+			<span>
+				<button onclick={getData}>refresh data</button>
 			</span>
 		</div>
 		<div class="box">
