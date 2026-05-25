@@ -6,8 +6,7 @@ global options:
 - [ ] look into how to use global state for things like torrent data, etc.
 global stats:
 - [ ] add network connection status: firewalled/connected/disconnected
-- [ ] visual for space used / available w/ labels:
-    pie chart? bar chart? some other plot? check chart.js available options
+- ~~[ ] visual for space used~~ cant do this one easily, no space used, only free space
 - [x] fix rid for /sync/maindata endpoint
 graphs:
 - [x] add default numbers for y axis
@@ -15,6 +14,7 @@ graphs:
 - [ ] add controls for graph
     - [ ] max time
     - [ ] graph style (btop graph settings)
+- [x] add tooltips for graphs on hover
 component stuff:
 - [ ] move graphs into their own components + figure out what to do with the create/update chart functions
 - [ ] move the other things too, see if theres a slot or something to pass data through
@@ -32,13 +32,22 @@ styling:
 		PointElement,
 		LinearScale,
 		CategoryScale,
-		Filler
+		Filler,
+		Tooltip
 	} from 'chart.js';
 	import type { TransferStats, torrentInfo } from '$lib/types';
-	Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler);
+	Chart.register(
+		LineController,
+		LineElement,
+		PointElement,
+		LinearScale,
+		CategoryScale,
+		Filler,
+		Tooltip
+	);
 
 	let GRAPH_TIME = 15;
-	let SPEED_UNITS: 'bits' | 'bytes' = $state('bits');
+	let SPEED_UNITS: 'bits' | 'bytes' = $state('bytes');
 	let STORAGE_UNITS: 'bytes' | 'binary' = $state('bytes');
 	let rid = $state(0);
 
@@ -75,6 +84,16 @@ styling:
 						fill: true,
 						tension: 0.3,
 						pointRadius: 0
+					},
+					{
+						// limit line
+						data: [],
+						borderColor: color + '99',
+						borderDash: [6, 4],
+						borderWidth: 1,
+						fill: false,
+						pointRadius: 0,
+						tension: 0
 					}
 				]
 			},
@@ -82,6 +101,10 @@ styling:
 				animation: false,
 				responsive: true,
 				maintainAspectRatio: false,
+				interaction: {
+					mode: 'index',
+					intersect: false
+				},
 				scales: {
 					x: { display: false },
 					y: {
@@ -90,15 +113,43 @@ styling:
 						ticks: { callback: (v) => format(SPEED_UNITS, v as number) + 'ps' }
 					}
 				},
-				plugins: { legend: { display: false } }
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							title: (items) => {
+								// items[0].dataIndex counts from the left of the visible slice
+								const totalPoints = items[0].chart.data.labels!.length;
+								const secondsAgo = totalPoints - 1 - items[0].dataIndex;
+								return secondsAgo === 0 ? 'now' : `${secondsAgo}s ago`;
+							},
+							label: (item) => {
+								if (item.datasetIndex === 0) {
+									return ` speed: ${format(SPEED_UNITS, item.parsed.y as number)}ps`;
+								}
+								if (item.datasetIndex === 1 && item.parsed.y != null && item.parsed.y > 0) {
+									return ` limit: ${format(SPEED_UNITS, item.parsed.y as number)}ps`;
+								}
+								return ''; // hide limit row when no limit set
+							}
+						},
+						filter: (item) => {
+							// suppress the empty limit label entirely
+							if (item.datasetIndex === 1 && item.parsed.y === 0) return false;
+							return true;
+						}
+					}
+				}
 			}
 		});
 	}
 
-	function updateChart(chart: Chart, speed: number[]) {
+	function updateChart(chart: Chart, speed: number[], limit: number) {
 		const slice = speed.slice(Math.max(0, speed.length - GRAPH_TIME));
 		chart.data.labels = slice.map((_, i) => i);
 		chart.data.datasets[0].data = slice;
+		// only draw limit line if limit is non-zero
+		chart.data.datasets[1].data = limit > 0 ? slice.map(() => limit) : [];
 		chart.update('none');
 	}
 
@@ -119,20 +170,24 @@ styling:
 		fetch('/qbt/transfer/info')
 			.then((res) => res.json())
 			.then((data) => {
-				uploadStats.session = Math.max(data.up_info_data, uploadStats.session);
-				uploadStats.limit = data.up_rate_limit;
-				uploadStats.speed.push(data.up_info_speed);
+				console.log('up info data:' + data.up_info_data);
+				if (data.up_info_data)
+					uploadStats.session = Math.max(data.up_info_data, uploadStats.session);
+				if (data.up_rate_limit) uploadStats.limit = data.up_rate_limit;
+				if (data.up_info_speed) uploadStats.speed.push(data.up_info_speed);
 
-				downloadStats.session = Math.max(data.dl_info_data, downloadStats.session);
-				downloadStats.limit = data.dl_rate_limit;
-				downloadStats.speed.push(data.dl_info_speed);
+				console.log('dl info data:' + data.dl_info_data);
+				if (data.dl_info_data)
+					downloadStats.session = Math.max(data.dl_info_data, downloadStats.session);
+				if (data.dl_rate_limit) downloadStats.limit = data.dl_rate_limit;
+				if (data.dl_info_speed) downloadStats.speed.push(data.dl_info_speed);
 
 				// prune speed list
 				uploadStats.speed = uploadStats.speed.slice(-GRAPH_TIME * 10);
 				downloadStats.speed = downloadStats.speed.slice(-GRAPH_TIME * 10);
 
-				if (uploadChart) updateChart(uploadChart, uploadStats.speed);
-				if (downloadChart) updateChart(downloadChart, downloadStats.speed);
+				if (uploadChart) updateChart(uploadChart, uploadStats.speed, uploadStats.limit);
+				if (downloadChart) updateChart(downloadChart, downloadStats.speed, downloadStats.limit);
 			});
 
 		fetch(`/qbt/sync/maindata?rid=${rid}`)
@@ -161,8 +216,8 @@ styling:
 
 	function toggleSpeedUnits() {
 		SPEED_UNITS = SPEED_UNITS == 'bytes' ? 'bits' : 'bytes';
-		if (uploadChart) updateChart(uploadChart, uploadStats.speed);
-		if (downloadChart) updateChart(downloadChart, downloadStats.speed);
+		if (uploadChart) updateChart(uploadChart, uploadStats.speed, uploadStats.limit);
+		if (downloadChart) updateChart(downloadChart, downloadStats.speed, downloadStats.limit);
 	}
 
 	function toggleDataUnits() {
